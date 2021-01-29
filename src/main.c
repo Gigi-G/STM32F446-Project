@@ -2,11 +2,104 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+
+#ifndef NULL
+#define NULL ((void *) 0)
+#endif
+
+struct node {
+	uint8_t data;
+	struct node *next;
+};
+typedef struct node node;
+
+struct queue {
+	int count;
+	node *head;
+	node *tail;
+};
+typedef struct queue queue;
+
+void initialize(queue *q) {
+	q->count = 0;
+	q->head = NULL;
+	q->tail = NULL;
+}
+
+int isempty(queue *q) {
+	return (q->count == 0);
+}
+
+uint8_t search(node *head, uint8_t data) {
+	if(head == NULL) return 0;
+	if(head->data == data) return 1;
+	return search(head->next, data);
+}
+
+uint8_t enqueue(queue *q, uint8_t value) {
+	uint8_t find = search(q->head, value);
+	if(find) return 0;
+	node *tmp;
+	tmp = malloc(sizeof(node));
+	tmp->data = value;
+	tmp->next = NULL;
+	if(!isempty(q)) {
+		q->tail->next = tmp;
+		q->tail = tmp;
+	}
+	else {
+		q->head = q->tail = tmp;
+	}
+	q->count++;
+	return 1;
+}
+
+uint8_t dequeue(queue *q){
+	node *tmp;
+	uint8_t n = q->head->data;
+	tmp = q->head;
+	q->head = q->head->next;
+	q->count--;
+	free(tmp);
+	return n;
+}
+
+typedef struct {
+	uint8_t moving;
+	uint8_t selectedFloor;
+	uint8_t floor;
+	uint8_t direction;
+	uint16_t speed;
+} Elevator;
+
+typedef enum {
+	SELECT,
+	SETUP,
+	CLOSE_DOOR,
+	OPEN_DOOR,
+	MOVING
+} State;
+
+typedef enum {
+	NONE
+} Event;
+
+queue *reservation;
+Elevator elevator;
+State stato = SELECT;
+Event evento = NONE;
+
+int counter = 0;
+char hyphen = '-';
+char buffer[5];
 
 void start() {
-	//Random
-	srand(time(0));
+	//Elevator
+	elevator.moving = 0;
+	elevator.selectedFloor = 1;
+	elevator.floor = 1;
+	elevator.speed = 10;
+	elevator.direction = 1;
 
 	//GPIO initialize
 	GPIO_init(GPIOB);
@@ -25,25 +118,28 @@ void start() {
 
 	//TIMER initialize
 	TIM_init(TIM2);
-	TIM_config_timebase(TIM2, 8400, 100); //Update IRQ ogni 10ms
+	TIM_config_timebase(TIM2, 8400, 1000); //Update IRQ ogni 100ms
 	TIM_enable_irq(TIM2, IRQ_UPDATE);
-	TIM_on(TIM2);
 	TIM_init(TIM3);
-	TIM_config_timebase(TIM3, 8400, 5000); //Update IRQ ogni 500ms
+	TIM_config_timebase(TIM3, 8400, 10000); //Update IRQ ogni 1s -> questo timer si setta in base alla velocità dell'ascensore
 	TIM_enable_irq(TIM3, IRQ_UPDATE);
-	TIM_on(TIM3);
 
 	//ADC initialize
-	ADC_init(ADC1, ADC_RES_12, ADC_ALIGN_RIGHT);
+	ADC_init(ADC1, ADC_RES_8, ADC_ALIGN_RIGHT);
 	ADC_channel_config(ADC1, GPIOC, 0, 10);
-	ADC_channel_config(ADC1, GPIOC, 1, 11);
 	ADC_on(ADC1);
 
 	//Display
 	DISPLAY_init();
+	sprintf(buffer, "%4d\0", elevator.floor);
+	DISPLAY_puts(0, buffer);
 
 	//USART
 	CONSOLE_init();
+
+	//RESERVATION initialize
+	reservation = malloc(sizeof(queue));
+	initialize(reservation);
 }
 
 void setRedLed(int i) {
@@ -58,66 +154,174 @@ void setYellowLed(int i) {
 	GPIOC->ODR = (GPIOC->ODR & ~(uint32_t)(4)) | (i << 2);
 }
 
-typedef enum {
-	RUN,
-	SETUP
-} State;
-
-State stato = RUN;
-
 int main() {
 	start();
 	for(;;) {
+		switch(stato) {
+			case SETUP: {
+				ADC_sample_channel(ADC1, 10);
+				ADC_start(ADC1);
+				while(!ADC_completed(ADC1)) {}
+				elevator.speed = (ADC_read(ADC1) * 6)/255 + 4;
+				if(elevator.speed != 10) sprintf(buffer, "%3d%d\0", 0, elevator.speed);
+				else sprintf(buffer, "%4d\0", elevator.speed);
+				DISPLAY_dp(2, 1);
+				DISPLAY_puts(0, buffer);
+				break;
+			}
+			case SELECT:  {
+				DISPLAY_dp(2, 0);
+				sprintf(buffer, "%4d\0", elevator.floor);
+				DISPLAY_puts(0, buffer);
+				break;
+			}
+		}
+	}
+}
 
+void selectFloor(uint8_t floor) {
+	switch(stato) {
+		case SELECT: {
+			if(elevator.selectedFloor == floor) break;
+			elevator.selectedFloor = floor;
+			stato = CLOSE_DOOR;
+			TIM_on(TIM2);
+			break;
+		}
+		default: {
+			enqueue(reservation, floor);
+			break;
+		}
 	}
 }
 
 void EXTI15_10_IRQHandler(void) {
-	if(EXTI_isset(EXTI10)) { //Button X
-		if(stato == RUN) {
-
-		}
-		else if(stato == SETUP) {
-
-		}
+	if(EXTI_isset(EXTI10)) { //Button X = Primo Piano
+		selectFloor(1);
 		EXTI_clear(EXTI10);
 	}
 }
 
 void EXTI4_IRQHandler(void) {
-	if(EXTI_isset(EXTI4)) { //Button Y
-		if(stato == SETUP) {
-
-		}
+	if(EXTI_isset(EXTI4)) { //Button Y = Seconda Piano
+		selectFloor(2);
 		EXTI_clear(EXTI4);
 	}
 }
 
 void EXTI9_5_IRQHandler(void) {
-	if(EXTI_isset(EXTI5)) { //Button Z
-
+	if(EXTI_isset(EXTI5)) { //Button Z = Terzo Piano
+		selectFloor(3);
 		EXTI_clear(EXTI5);
 	}
 	if(EXTI_isset(EXTI6)) { //Button T
-
+		if(stato == SELECT) {
+			stato = SETUP;
+		}
+		else if(stato == SETUP) {
+			stato = SELECT;
+			TIM_off(TIM3);
+			TIM_config_timebase(TIM3, 8400, 1000*elevator.speed);
+		}
 		EXTI_clear(EXTI6);
 	}
 }
 
 void TIM2_IRQHandler(void) {
 	if(TIM_update_check(TIM2)) {
-
+		switch(stato) {
+			case CLOSE_DOOR: {
+				counter+=100;
+				if(counter == 1500) {
+					counter = 0;
+					if(elevator.floor > elevator.selectedFloor) elevator.direction = -1;
+					else elevator.direction = 1;
+					elevator.moving = 1;
+					stato = MOVING;
+					TIM_set(TIM3, 0);
+					TIM_on(TIM3);
+					TIM_set(TIM2,0);
+					setRedLed(0);
+				}
+				else if(counter%200 == 0) {
+					GPIO_toggle(GPIOB, 0);
+				}
+				break;
+			}
+			case OPEN_DOOR: {
+				counter+=100;
+				if(counter == 1500) {
+					counter = 0;
+					if(isempty(reservation)) {
+						elevator.moving = 0;
+						stato = SELECT;
+						TIM_off(TIM3);
+						TIM_off(TIM2);
+						setGreenLed(0);
+					}
+					else {
+						elevator.selectedFloor = dequeue(reservation);
+						stato = CLOSE_DOOR;
+						TIM_off(TIM3);
+						setGreenLed(0);
+					}
+				}
+				else if(counter%200 == 0) {
+					GPIO_toggle(GPIOC, 3);
+				}
+				break;
+			}
+			case MOVING: {
+				counter+=100;
+				if(counter%200 == 0) {
+					GPIO_toggle(GPIOC, 2);
+				}
+				break;
+			}
+		}
 		TIM_update_clear(TIM2);
 	}
 }
 
 void TIM3_IRQHandler(void) {
 	if(TIM_update_check(TIM3)) {
-		if(stato == SETUP) {
-
-		}
-		else if(stato == RUN) {
-
+		if(stato == MOVING) {
+			if(elevator.selectedFloor == elevator.floor) {
+				TIM_off(TIM2);
+				counter = 0;
+				elevator.floor = (char)(elevator.selectedFloor);
+				setYellowLed(0);
+				sprintf(buffer, "%4d\0", elevator.floor);
+				DISPLAY_puts(0, buffer);
+				hyphen = '-';
+				stato = OPEN_DOOR;
+				TIM_set(TIM2, 0);
+				TIM_on(TIM2);
+			} else {
+				if(elevator.direction == 1) {
+					if(hyphen == '-') {
+						sprintf(buffer, "%3d%c\0", elevator.floor, hyphen);
+						hyphen = ' ';
+					}
+					else {
+						elevator.floor += elevator.direction;
+						sprintf(buffer, "%4d\0", elevator.floor);
+						hyphen = '-';
+					}
+				}
+				else {
+					if(hyphen == '-') {
+						elevator.floor += elevator.direction;
+						sprintf(buffer, "%3d%c\0", elevator.floor, hyphen);
+						hyphen = ' ';
+					}
+					else {
+						sprintf(buffer, "%4d\0", elevator.floor);
+						hyphen = '-';
+					}
+				}
+				DISPLAY_puts(0, buffer);
+			}
 		}
 		TIM_update_clear(TIM3);
 	}
