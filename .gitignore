@@ -1,0 +1,9 @@
+Debug
+inc
+LinkerScript.ld
+NUCLEO-F446RE.xml
+test-project Run.cfg
+startup
+.project
+.cproject
+.settings
