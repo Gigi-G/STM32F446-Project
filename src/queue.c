@@ -82,3 +82,7 @@ uint8_t dequeue(queue *q){
 	free(tmp);
 	return n;
 }
+
+uint8_t readTail(queue *q) {
+	return q->tail->data;
+}

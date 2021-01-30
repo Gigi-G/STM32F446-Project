@@ -18,7 +18,7 @@ char buffer[5];
 void printLog(char* s) {
 	printf("\n-----------------------------------------------------------------------------------------\n");
 	printf("%s\n", s);
-	printf("-----------------------------------------------------------------------------------------\n");
+	printf("-----------------------------------------------------------------------------------------\n\n");
 }
 
 void start() {
@@ -81,24 +81,34 @@ int main() {
 	for(;;) {
 		switch(lift->st) {
 			case SETUP: {
+				if(lift->ev == ENTERSETUP) {
+					printLog("System enter setup mode...");
+					lift->ev = NONE;
+					DISPLAY_dp(2, 1);
+				}
 				ADC_sample_channel(ADC1, 10);
 				ADC_start(ADC1);
 				while(!ADC_completed(ADC1)) {}
 				lift->speed = (ADC_read(ADC1) * 6)/255 + 4;
 				if(lift->speed != 10) sprintf(buffer, "%3d%d", 0, lift->speed);
 				else sprintf(buffer, "%4d", lift->speed);
-				DISPLAY_dp(2, 1);
 				DISPLAY_puts(0, buffer);
 				break;
 			}
 			case SELECT:  {
-				DISPLAY_dp(2, 0);
-				sprintf(buffer, "%4d", lift->floor);
-				DISPLAY_puts(0, buffer);
+				if(lift->ev == QUITSETUP) {
+					printLog(getInfoSpeed(lift));
+					printLog("System quit setup mode...");
+					lift->ev = NONE;
+					DISPLAY_dp(2, 0);
+					sprintf(buffer, "%4d", lift->floor);
+					DISPLAY_puts(0, buffer);
+				}
 				break;
 			}
 			case CLOSE_DOOR: {
 				if(lift->ev == CLOSING) {
+					printLog(getInfoDestination(lift));
 					printLog(getInfoClosing(lift));
 					lift->ev = NONE;
 					TIM_set(TIM2, 0);
@@ -128,6 +138,10 @@ int main() {
 void EXTI15_10_IRQHandler(void) {
 	if(EXTI_isset(EXTI10)) { //Button X = First floor
 		selectFloor(1, lift);
+		if(lift->ev == NEWRESERVATION || lift->ev == EXISTRESERVATION || lift->ev == NORESERVATION) {
+			printLog(getInfoReservation(lift));
+			lift->ev = NONE;
+		}
 		EXTI_clear(EXTI10);
 	}
 }
@@ -135,6 +149,10 @@ void EXTI15_10_IRQHandler(void) {
 void EXTI4_IRQHandler(void) {
 	if(EXTI_isset(EXTI4)) { //Button Y = Second floor
 		selectFloor(2, lift);
+		if(lift->ev == NEWRESERVATION || lift->ev == EXISTRESERVATION || lift->ev == NORESERVATION) {
+			printLog(getInfoReservation(lift));
+			lift->ev = NONE;
+		}
 		EXTI_clear(EXTI4);
 	}
 }
@@ -142,13 +160,19 @@ void EXTI4_IRQHandler(void) {
 void EXTI9_5_IRQHandler(void) {
 	if(EXTI_isset(EXTI5)) { //Button Z = Third floor
 		selectFloor(3, lift);
+		if(lift->ev == NEWRESERVATION || lift->ev == EXISTRESERVATION || lift->ev == NORESERVATION) {
+			printLog(getInfoReservation(lift));
+			lift->ev = NONE;
+		}
 		EXTI_clear(EXTI5);
 	}
-	if(EXTI_isset(EXTI6)) { //Button T
+	if(EXTI_isset(EXTI6)) { //Button T = ENTER/QUIT SETUP mode
 		if(lift->st == SELECT) {
+			lift->ev = ENTERSETUP;
 			lift->st = SETUP;
 		}
 		else if(lift->st == SETUP) {
+			lift->ev = QUITSETUP;
 			lift->st = SELECT;
 			TIM_off(TIM3);
 			TIM_config_timebase(TIM3, 8400, 1000*lift->speed);
@@ -238,11 +262,11 @@ void TIM3_IRQHandler(void) {
 				}
 				else {
 					if(hyphen == '-') {
-						lift->floor += lift->direction;
-						sprintf(buffer, "%3d%c", lift->floor, hyphen);
+						sprintf(buffer, "%3d%c", lift->floor-1, hyphen);
 						hyphen = ' ';
 					}
 					else {
+						lift->floor += lift->direction;
 						sprintf(buffer, "%4d", lift->floor);
 						hyphen = '-';
 					}

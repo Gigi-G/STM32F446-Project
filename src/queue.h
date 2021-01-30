@@ -40,4 +40,6 @@ uint8_t enqueue(queue *q, uint8_t value);
 
 uint8_t dequeue(queue *q);
 
+uint8_t readTail(queue *q);
+
 #endif /* QUEUE_H_ */

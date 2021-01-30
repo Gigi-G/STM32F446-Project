@@ -24,6 +24,11 @@ typedef enum event {
 	CLOSING,
 	OPENING,
 	LIFTFLOOR,
+	ENTERSETUP,
+	QUITSETUP,
+	NEWRESERVATION,
+	EXISTRESERVATION,
+	NORESERVATION,
 	NONE
 } event;
 
@@ -46,6 +51,12 @@ char* getInfoClosing(elevator* e);
 
 char* getInfoOpening(elevator* e);
 
+char* getInfoDestination(elevator *e);
+
 char* getInfoLiftFloor(char* s);
+
+char* getInfoSpeed(elevator *e);
+
+char* getInfoReservation(elevator *e);
 
 #endif /* ELEVATOR_H_ */
