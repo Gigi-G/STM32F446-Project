@@ -35,6 +35,7 @@ typedef enum event {
 struct elevator {
 	state st;
 	event ev;
+	event res;
 	uint8_t selectedFloor;
 	uint8_t floor;
 	uint8_t direction;

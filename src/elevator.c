@@ -11,6 +11,7 @@
 void initializeElevator(elevator *e) {
 	e->direction = 1;
 	e->ev = NONE;
+	e->res = NONE;
 	e->floor = 1;
 	e->reservation = malloc(sizeof(queue));
 	initialize(e->reservation);
@@ -22,24 +23,18 @@ void initializeElevator(elevator *e) {
 void selectFloor(uint8_t floor, elevator *e) {
 	switch(e->st) {
 		case SELECT: {
-			if(e->selectedFloor == floor) {
-				e->ev = NORESERVATION;
-				break;
-			}
+			if(e->selectedFloor == floor) {e->res = NORESERVATION; break;}
 			e->selectedFloor = floor;
 			e->st = CLOSE_DOOR;
 			e->ev = CLOSING;
 			break;
 		}
 		default: {
-			if(e->selectedFloor == floor) {
-				e->ev = EXISTRESERVATION;
-				break;
-			}
+			if(e->selectedFloor == floor) {e->res = EXISTRESERVATION; break;}
 			if(enqueue(e->reservation, floor) == 1)
-				e->ev = NEWRESERVATION;
+				e->res = NEWRESERVATION;
 			else
-				e->ev = EXISTRESERVATION;
+				e->res = EXISTRESERVATION;
 			break;
 		}
 	}
@@ -77,13 +72,13 @@ char* getInfoSpeed(elevator *e) {
 
 char* getInfoReservation(elevator *e) {
 	char *buf = malloc(sizeof(char)*1024);
-	if(e->ev == NORESERVATION) {
+	if(e->res == NORESERVATION) {
 		sprintf(buf, "You already are at floor %d", e->floor);
 	}
-	else if(e->ev == EXISTRESERVATION) {
+	else if(e->res == EXISTRESERVATION) {
 		sprintf(buf, "The floor selected is a future destination, wait for it...");
 	}
-	else if(e->ev == NEWRESERVATION) {
+	else if(e->res == NEWRESERVATION) {
 		sprintf(buf, "The new reservation is for floor %d", readTail(e->reservation));
 	}
 	return buf;
