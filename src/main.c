@@ -1,68 +1,15 @@
+/*
+ * main.c
+ *
+ *  Created on: 29 gen 2021
+ *      Author: gigi-g
+ */
+
 #include "stm32_unict_lib.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifndef NULL
-#define NULL ((void *) 0)
-#endif
-
-struct node {
-	uint8_t data;
-	struct node *next;
-};
-typedef struct node node;
-
-struct queue {
-	int count;
-	node *head;
-	node *tail;
-};
-typedef struct queue queue;
-
-void initialize(queue *q) {
-	q->count = 0;
-	q->head = NULL;
-	q->tail = NULL;
-}
-
-int isempty(queue *q) {
-	return (q->count == 0);
-}
-
-uint8_t search(node *head, uint8_t data) {
-	if(head == NULL) return 0;
-	if(head->data == data) return 1;
-	return search(head->next, data);
-}
-
-uint8_t enqueue(queue *q, uint8_t value) {
-	uint8_t find = search(q->head, value);
-	if(find) return 0;
-	node *tmp;
-	tmp = malloc(sizeof(node));
-	tmp->data = value;
-	tmp->next = NULL;
-	if(!isempty(q)) {
-		q->tail->next = tmp;
-		q->tail = tmp;
-	}
-	else {
-		q->head = q->tail = tmp;
-	}
-	q->count++;
-	return 1;
-}
-
-uint8_t dequeue(queue *q){
-	node *tmp;
-	uint8_t n = q->head->data;
-	tmp = q->head;
-	q->head = q->head->next;
-	q->count--;
-	free(tmp);
-	return n;
-}
+#include "queue.h"
 
 typedef struct {
 	uint8_t moving;
@@ -189,6 +136,7 @@ void selectFloor(uint8_t floor) {
 			break;
 		}
 		default: {
+			if(elevator.selectedFloor == floor) break;
 			enqueue(reservation, floor);
 			break;
 		}
