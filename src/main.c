@@ -291,46 +291,63 @@ void TIM2_IRQHandler(void) {
 	}
 }
 
+void restore() {
+	TIM_off(TIM2);
+	TIM_off(TIM3);
+	counter = 0;
+	hyphen = '-';
+}
+
+void newInformation() {
+	lift->floor = (char)(lift->selectedFloor);
+	GPIO_write(GPIOC, 2, 0);
+	sprintf(buffer, "%4d", lift->floor);
+	DISPLAY_puts(0, buffer);
+}
+
+void destinationReached() {
+	restore();
+	newInformation();
+	lift->st = OPEN_DOOR;
+	lift->ev = OPENING;
+}
+
+void goUp() {
+	if(hyphen == '-') {
+		sprintf(buffer, "%3d%c", lift->floor, hyphen);
+		hyphen = ' ';
+	}
+	else {
+		lift->floor += lift->direction;
+		sprintf(buffer, "%4d", lift->floor);
+		hyphen = '-';
+	}
+}
+
+void goDown() {
+	if(hyphen == '-') {
+		sprintf(buffer, "%3d%c", lift->floor-1, hyphen);
+		hyphen = ' ';
+	}
+	else {
+		lift->floor += lift->direction;
+		sprintf(buffer, "%4d", lift->floor);
+		hyphen = '-';
+	}
+}
+
+void elevatorMovement() {
+	if(lift->direction == 1) goUp();
+	else goDown();
+	lift->ev = LIFTFLOOR;
+	DISPLAY_puts(0, buffer);
+}
+
 void TIM3_IRQHandler(void) {
 	if(TIM_update_check(TIM3)) {
 		if(lift->st == MOVING) {
-			if(lift->selectedFloor == lift->floor) {
-				TIM_off(TIM2);
-				TIM_off(TIM3);
-				counter = 0;
-				lift->floor = (char)(lift->selectedFloor);
-				GPIO_write(GPIOC, 2, 0);
-				sprintf(buffer, "%4d", lift->floor);
-				DISPLAY_puts(0, buffer);
-				hyphen = '-';
-				lift->st = OPEN_DOOR;
-				lift->ev = OPENING;
-			} else {
-				if(lift->direction == 1) {
-					if(hyphen == '-') {
-						sprintf(buffer, "%3d%c", lift->floor, hyphen);
-						hyphen = ' ';
-					}
-					else {
-						lift->floor += lift->direction;
-						sprintf(buffer, "%4d", lift->floor);
-						hyphen = '-';
-					}
-				}
-				else {
-					if(hyphen == '-') {
-						sprintf(buffer, "%3d%c", lift->floor-1, hyphen);
-						hyphen = ' ';
-					}
-					else {
-						lift->floor += lift->direction;
-						sprintf(buffer, "%4d", lift->floor);
-						hyphen = '-';
-					}
-				}
-				lift->ev = LIFTFLOOR;
-				DISPLAY_puts(0, buffer);
-			}
+			if(lift->selectedFloor == lift->floor) destinationReached();
+			else elevatorMovement();
 		}
 		TIM_update_clear(TIM3);
 	}
