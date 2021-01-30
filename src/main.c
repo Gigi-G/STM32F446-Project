@@ -6,47 +6,25 @@
  */
 
 #include "stm32_unict_lib.h"
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "queue.h"
+#include "elevator.h"
 
-typedef struct {
-	uint8_t moving;
-	uint8_t selectedFloor;
-	uint8_t floor;
-	uint8_t direction;
-	uint16_t speed;
-} Elevator;
-
-typedef enum {
-	SELECT,
-	SETUP,
-	CLOSE_DOOR,
-	OPEN_DOOR,
-	MOVING
-} State;
-
-typedef enum {
-	NONE
-} Event;
-
-queue *reservation;
-Elevator elevator;
-State stato = SELECT;
-Event evento = NONE;
-
+elevator *lift;
 int counter = 0;
 char hyphen = '-';
 char buffer[5];
 
+void printLog(char* s) {
+	printf("\n-----------------------------------------------------------------------------------------\n");
+	printf("%s\n", s);
+	printf("-----------------------------------------------------------------------------------------\n");
+}
+
 void start() {
-	//Elevator
-	elevator.moving = 0;
-	elevator.selectedFloor = 1;
-	elevator.floor = 1;
-	elevator.speed = 10;
-	elevator.direction = 1;
+	//ELEVATOR initialize
+	lift = malloc(sizeof(elevator));
+	initializeElevator(lift);
 
 	//GPIO initialize
 	GPIO_init(GPIOB);
@@ -68,7 +46,7 @@ void start() {
 	TIM_config_timebase(TIM2, 8400, 1000); //Update IRQ ogni 100ms
 	TIM_enable_irq(TIM2, IRQ_UPDATE);
 	TIM_init(TIM3);
-	TIM_config_timebase(TIM3, 8400, 10000); //Update IRQ ogni 1s -> questo timer si setta in base alla velocità dell'ascensore
+	TIM_config_timebase(TIM3, 8400, 10000); //Update IRQ ogni 1s
 	TIM_enable_irq(TIM3, IRQ_UPDATE);
 
 	//ADC initialize
@@ -76,17 +54,14 @@ void start() {
 	ADC_channel_config(ADC1, GPIOC, 0, 10);
 	ADC_on(ADC1);
 
-	//Display
+	//DISPLAY
 	DISPLAY_init();
-	sprintf(buffer, "%4d\0", elevator.floor);
+	sprintf(buffer, "%4d", lift->floor);
 	DISPLAY_puts(0, buffer);
 
 	//USART
 	CONSOLE_init();
-
-	//RESERVATION initialize
-	reservation = malloc(sizeof(queue));
-	initialize(reservation);
+	printLog("System is running...");
 }
 
 void setRedLed(int i) {
@@ -104,72 +79,79 @@ void setYellowLed(int i) {
 int main() {
 	start();
 	for(;;) {
-		switch(stato) {
+		switch(lift->st) {
 			case SETUP: {
 				ADC_sample_channel(ADC1, 10);
 				ADC_start(ADC1);
 				while(!ADC_completed(ADC1)) {}
-				elevator.speed = (ADC_read(ADC1) * 6)/255 + 4;
-				if(elevator.speed != 10) sprintf(buffer, "%3d%d\0", 0, elevator.speed);
-				else sprintf(buffer, "%4d\0", elevator.speed);
+				lift->speed = (ADC_read(ADC1) * 6)/255 + 4;
+				if(lift->speed != 10) sprintf(buffer, "%3d%d", 0, lift->speed);
+				else sprintf(buffer, "%4d", lift->speed);
 				DISPLAY_dp(2, 1);
 				DISPLAY_puts(0, buffer);
 				break;
 			}
 			case SELECT:  {
 				DISPLAY_dp(2, 0);
-				sprintf(buffer, "%4d\0", elevator.floor);
+				sprintf(buffer, "%4d", lift->floor);
 				DISPLAY_puts(0, buffer);
 				break;
+			}
+			case CLOSE_DOOR: {
+				if(lift->ev == CLOSING) {
+					printLog(getInfoClosing(lift));
+					lift->ev = NONE;
+					TIM_set(TIM2, 0);
+					TIM_on(TIM2);
+				}
+				break;
+			}
+			case OPEN_DOOR: {
+				if(lift->ev == OPENING) {
+					printLog(getInfoOpening(lift));
+					lift->ev = NONE;
+					TIM_set(TIM2, 0);
+					TIM_on(TIM2);
+				}
+				break;
+			}
+			case MOVING: {
+				if(lift->ev == LIFTFLOOR) {
+					printLog(getInfoLiftFloor(buffer));
+					lift->ev = NONE;
+				}
 			}
 		}
 	}
 }
 
-void selectFloor(uint8_t floor) {
-	switch(stato) {
-		case SELECT: {
-			if(elevator.selectedFloor == floor) break;
-			elevator.selectedFloor = floor;
-			stato = CLOSE_DOOR;
-			TIM_on(TIM2);
-			break;
-		}
-		default: {
-			if(elevator.selectedFloor == floor) break;
-			enqueue(reservation, floor);
-			break;
-		}
-	}
-}
-
 void EXTI15_10_IRQHandler(void) {
-	if(EXTI_isset(EXTI10)) { //Button X = Primo Piano
-		selectFloor(1);
+	if(EXTI_isset(EXTI10)) { //Button X = First floor
+		selectFloor(1, lift);
 		EXTI_clear(EXTI10);
 	}
 }
 
 void EXTI4_IRQHandler(void) {
-	if(EXTI_isset(EXTI4)) { //Button Y = Seconda Piano
-		selectFloor(2);
+	if(EXTI_isset(EXTI4)) { //Button Y = Second floor
+		selectFloor(2, lift);
 		EXTI_clear(EXTI4);
 	}
 }
 
 void EXTI9_5_IRQHandler(void) {
-	if(EXTI_isset(EXTI5)) { //Button Z = Terzo Piano
-		selectFloor(3);
+	if(EXTI_isset(EXTI5)) { //Button Z = Third floor
+		selectFloor(3, lift);
 		EXTI_clear(EXTI5);
 	}
 	if(EXTI_isset(EXTI6)) { //Button T
-		if(stato == SELECT) {
-			stato = SETUP;
+		if(lift->st == SELECT) {
+			lift->st = SETUP;
 		}
-		else if(stato == SETUP) {
-			stato = SELECT;
+		else if(lift->st == SETUP) {
+			lift->st = SELECT;
 			TIM_off(TIM3);
-			TIM_config_timebase(TIM3, 8400, 1000*elevator.speed);
+			TIM_config_timebase(TIM3, 8400, 1000*lift->speed);
 		}
 		EXTI_clear(EXTI6);
 	}
@@ -177,15 +159,14 @@ void EXTI9_5_IRQHandler(void) {
 
 void TIM2_IRQHandler(void) {
 	if(TIM_update_check(TIM2)) {
-		switch(stato) {
+		switch(lift->st) {
 			case CLOSE_DOOR: {
 				counter+=100;
 				if(counter == 1500) {
 					counter = 0;
-					if(elevator.floor > elevator.selectedFloor) elevator.direction = -1;
-					else elevator.direction = 1;
-					elevator.moving = 1;
-					stato = MOVING;
+					if(lift->floor > lift->selectedFloor) lift->direction = -1;
+					else lift->direction = 1;
+					lift->st = MOVING;
 					TIM_set(TIM3, 0);
 					TIM_on(TIM3);
 					TIM_set(TIM2,0);
@@ -200,17 +181,15 @@ void TIM2_IRQHandler(void) {
 				counter+=100;
 				if(counter == 1500) {
 					counter = 0;
-					if(isempty(reservation)) {
-						elevator.moving = 0;
-						stato = SELECT;
-						TIM_off(TIM3);
-						TIM_off(TIM2);
+					TIM_off(TIM2);
+					if(isempty(lift->reservation)) {
+						lift->st = SELECT;
 						setGreenLed(0);
 					}
 					else {
-						elevator.selectedFloor = dequeue(reservation);
-						stato = CLOSE_DOOR;
-						TIM_off(TIM3);
+						lift->selectedFloor = dequeue(lift->reservation);
+						lift->st = CLOSE_DOOR;
+						lift->ev = CLOSING;
 						setGreenLed(0);
 					}
 				}
@@ -233,41 +212,42 @@ void TIM2_IRQHandler(void) {
 
 void TIM3_IRQHandler(void) {
 	if(TIM_update_check(TIM3)) {
-		if(stato == MOVING) {
-			if(elevator.selectedFloor == elevator.floor) {
+		if(lift->st == MOVING) {
+			if(lift->selectedFloor == lift->floor) {
 				TIM_off(TIM2);
+				TIM_off(TIM3);
 				counter = 0;
-				elevator.floor = (char)(elevator.selectedFloor);
+				lift->floor = (char)(lift->selectedFloor);
 				setYellowLed(0);
-				sprintf(buffer, "%4d\0", elevator.floor);
+				sprintf(buffer, "%4d", lift->floor);
 				DISPLAY_puts(0, buffer);
 				hyphen = '-';
-				stato = OPEN_DOOR;
-				TIM_set(TIM2, 0);
-				TIM_on(TIM2);
+				lift->st = OPEN_DOOR;
+				lift->ev = OPENING;
 			} else {
-				if(elevator.direction == 1) {
+				if(lift->direction == 1) {
 					if(hyphen == '-') {
-						sprintf(buffer, "%3d%c\0", elevator.floor, hyphen);
+						sprintf(buffer, "%3d%c", lift->floor, hyphen);
 						hyphen = ' ';
 					}
 					else {
-						elevator.floor += elevator.direction;
-						sprintf(buffer, "%4d\0", elevator.floor);
+						lift->floor += lift->direction;
+						sprintf(buffer, "%4d", lift->floor);
 						hyphen = '-';
 					}
 				}
 				else {
 					if(hyphen == '-') {
-						elevator.floor += elevator.direction;
-						sprintf(buffer, "%3d%c\0", elevator.floor, hyphen);
+						lift->floor += lift->direction;
+						sprintf(buffer, "%3d%c", lift->floor, hyphen);
 						hyphen = ' ';
 					}
 					else {
-						sprintf(buffer, "%4d\0", elevator.floor);
+						sprintf(buffer, "%4d", lift->floor);
 						hyphen = '-';
 					}
 				}
+				lift->ev = LIFTFLOOR;
 				DISPLAY_puts(0, buffer);
 			}
 		}
