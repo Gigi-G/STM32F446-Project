@@ -76,7 +76,7 @@ void start() {
 
 	// TIM3 is used for the speed of the elevator
 	TIM_init(TIM3);
-	TIM_config_timebase(TIM3, 8400, 10000);
+	TIM_config_timebase(TIM3, 8400, 5000);
 	TIM_enable_irq(TIM3, IRQ_UPDATE);
 
 	//ADC initialize
@@ -191,21 +191,21 @@ int main() {
 
 void EXTI15_10_IRQHandler(void) {
 	if(EXTI_isset(EXTI10)) { //Button X = First floor
-		selectFloor(1, lift);
+		if(lift->st != SETUP) selectFloor(1, lift);
 		EXTI_clear(EXTI10);
 	}
 }
 
 void EXTI4_IRQHandler(void) {
 	if(EXTI_isset(EXTI4)) { //Button Y = Second floor
-		selectFloor(2, lift);
+		if(lift->st != SETUP) selectFloor(2, lift);
 		EXTI_clear(EXTI4);
 	}
 }
 
 void EXTI9_5_IRQHandler(void) {
 	if(EXTI_isset(EXTI5)) { //Button Z = Third floor
-		selectFloor(3, lift);
+		if(lift->st != SETUP) selectFloor(3, lift);
 		EXTI_clear(EXTI5);
 	}
 	if(EXTI_isset(EXTI6)) { //Button T = ENTER/QUIT SETUP mode
@@ -216,7 +216,7 @@ void EXTI9_5_IRQHandler(void) {
 		else if(lift->st == SETUP) {
 			lift->ev = QUITSETUP;
 			lift->st = SELECT;
-			TIM_config_timebase(TIM3, 8400, 1000*lift->speed);
+			TIM_config_timebase(TIM3, 8400, 500*lift->speed);
 		}
 		EXTI_clear(EXTI6);
 	}
@@ -229,12 +229,14 @@ void selectDirection() {
 
 void closeDoorTimeOut() {
 	counter = 0;
+	TIM_off(TIM2);
+	GPIO_write(GPIOB, 0, 0);
 	selectDirection();
 	lift->st = MOVING;
 	TIM_set(TIM3, 0);
-	TIM_on(TIM3);
 	TIM_set(TIM2,0);
-	GPIO_write(GPIOB, 0, 0);
+	TIM_on(TIM3);
+	TIM_on(TIM2);
 }
 
 void closeDoorTIM2() {
@@ -346,8 +348,8 @@ void elevatorMovement() {
 void TIM3_IRQHandler(void) {
 	if(TIM_update_check(TIM3)) {
 		if(lift->st == MOVING) {
+			elevatorMovement();
 			if(lift->selectedFloor == lift->floor) destinationReached();
-			else elevatorMovement();
 		}
 		TIM_update_clear(TIM3);
 	}
