@@ -83,6 +83,12 @@ uint8_t dequeue(queue *q){
 	return n;
 }
 
+/**
+ * The last element of the queue is read.
+ *
+ * @param	q is a pointer to a struct queue
+ * @return	n is the value of the last element of the queue
+ */
 uint8_t readTail(queue *q) {
 	return q->tail->data;
 }

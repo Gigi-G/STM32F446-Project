@@ -56,6 +56,7 @@ void selectFloor(uint8_t floor, elevator *e) {
  * Provides information about the floor where the door is closing.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoClosing(elevator* e) {
 	char *buf = malloc(sizeof(char)*1024);
@@ -67,6 +68,7 @@ char* getInfoClosing(elevator* e) {
  * Provides information about the floor where the door is opening.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoOpening(elevator* e) {
 	char *buf = malloc(sizeof(char)*1024);
@@ -78,6 +80,7 @@ char* getInfoOpening(elevator* e) {
  * Provides information about the next destination.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoDestination(elevator* e) {
 	char *buf = malloc(sizeof(char)*1024);
@@ -89,6 +92,7 @@ char* getInfoDestination(elevator* e) {
  * Provides information about the floor reached during the movement.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoLiftFloor(char* s) {
 	char *buf = malloc(sizeof(char)*1024);
@@ -100,6 +104,7 @@ char* getInfoLiftFloor(char* s) {
  * Provides information about the speed of the elevator.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoSpeed(elevator *e) {
 	char *buf = malloc(sizeof(char)*1024);
@@ -114,6 +119,7 @@ char* getInfoSpeed(elevator *e) {
  * - NEWRESRVATION means that the selected floor is correctly reserved.
  *
  * @param	e is a pointer to a struct elevator
+ * @return	buf is a string that contains the information
  */
 char* getInfoReservation(elevator *e) {
 	char *buf = malloc(sizeof(char)*1024);
