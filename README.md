@@ -12,13 +12,13 @@ Nel caso si selezioni il piano in cui l'ascensore si trova già, non bisogna far
 
 La corsa dell'ascensore deve essere gestita nel seguente modo:
 
-- Si chiudono le porte; tale evento dura $1.5s$ ed è indicato dal lampeggio del led rosso con periodo di $200ms$.
+- Si chiudono le porte; tale evento dura 1.5s ed è indicato dal lampeggio del led rosso con periodo di 200ms.
 - Si avvia la corsa dell'ascensore verso il piano; durante la corsa occorre visualizzare, sul display, il piano via via raggiunto, simulando la presenza dell'ascensore tra due piani; in particolare, quando l'ascensore si trova tra il piano P e il piano P+1, occorre visualizzare sul display il numero P seguito da un trattino.
-- Durante la corsa occorre far lampeggiare il led giallo con periodo di $200ms$.
+- Durante la corsa occorre far lampeggiare il led giallo con periodo di 200ms.
 - La velocità dell'ascensore deve essere regolabile.
-- All'arrivo al piano, si aprono le porte; tale evento dura $1.5s$ ed è indicato dal lampeggio del led verde con periodo di $200ms$.
+- All'arrivo al piano, si aprono le porte; tale evento dura 1.5s ed è indicato dal lampeggio del led verde con periodo di 200ms.
 
-Alla pressione del tasto T il sistema deve entrare in uno stato di configurazione dal quale deve essere possibile, tramite uno dei trimmer, regolare la velocità dell'ascensore in un intervallo compreso tra $1 s/piano$ e $0.4 s/piano$, con granularità di $0.1 s/piano$ (visualizzare sul display il valore via via selezionato). Premendo nuovamente il tasto T si rientra nella normale operatività.
+Alla pressione del tasto T il sistema deve entrare in uno stato di configurazione dal quale deve essere possibile, tramite uno dei trimmer, regolare la velocità dell'ascensore in un intervallo compreso tra 1 s/piano e 0.4 s/piano, con granularità di 0.1 s/piano (visualizzare sul display il valore via via selezionato). Premendo nuovamente il tasto T si rientra nella normale operatività.
 
 Utilizzare la UART per stampare messaggi di log che segnalano gli eventi che accadono durante l'operatività.
 
